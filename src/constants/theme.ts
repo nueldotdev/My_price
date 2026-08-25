@@ -10,17 +10,42 @@ import { Platform } from 'react-native';
 export const Colors = {
   light: {
     text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    textTertiary: '#8A8E96',
+    background: '#fff9ed',
+    backgroundElement: '#ffffff',
+    backgroundSelected: '#E0E1E6',
+    border: '#E2E3E7',
+    accent: '#3D5AFE',
+
+    // verdict colors — background is a tint for badges/cards, text is the readable-on-tint version
+    goodDeal: '#1C8A4B',
+    goodDealBg: '#a5f0c2',
+    fair: '#8A7A00',
+    fairBg: '#f8e48d',
+    overpriced: '#C24A1F',
+    overpricedBg: '#ffbd8e',
+    suspicious: '#B0202E',
+    suspiciousBg: '#fe8a8a',
   },
   dark: {
     text: '#ffffff',
+    textSecondary: '#B0B4BA',
+    textTertiary: '#7E838B',
     background: '#000000',
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    border: '#2C2E33',
+    accent: '#5C7CFF',
+
+    goodDeal: '#4ADE80',
+    goodDealBg: '#16281F',
+    fair: '#E8D255',
+    fairBg: '#2B2712',
+    overpriced: '#FF8A5C',
+    overpricedBg: '#2E1D14',
+    suspicious: '#FF6B7A',
+    suspiciousBg: '#2E1418',
   },
 } as const;
 
