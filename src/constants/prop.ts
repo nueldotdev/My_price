@@ -7,7 +7,7 @@ export interface Prop {
 export type Verdict = "goodDeal" | "fair" | "overpriced" | "suspicious";
 
 export type card = {
-  id: number;
+  id: number | string;
   recordedAt: string;
   img?: ImageSourcePropType;
   original_price?: number;

@@ -1,13 +1,22 @@
 import Cards from "@/components/cards";
-import { cardList } from "@/constants/demo-data";
-import { card } from "@/constants/prop";
 import { Colors } from "@/constants/theme";
-import { Link, router } from "expo-router";
-import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
+import { PriceCheck, deleteCheck, getChecks } from "@/lib/db";
+import { Link, router, useFocusEffect } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import bold from "expo-symbols/androidWeights/bold";
+import { useCallback, useState } from "react";
+import {
+  Alert,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 const colors = Colors.light;
 
-const getDateKey = (recordedAt: string): string => {
+const getDateKey = (recordedAt: number): string => {
   const date = new Date(recordedAt);
 
   return [date.getFullYear(), date.getMonth(), date.getDate()]
@@ -15,7 +24,7 @@ const getDateKey = (recordedAt: string): string => {
     .join("-");
 };
 
-const formatSectionDate = (recordedAt: string): string =>
+const formatSectionDate = (recordedAt: number): string =>
   new Date(recordedAt).toLocaleDateString(undefined, {
     weekday: "long",
     month: "long",
@@ -23,29 +32,68 @@ const formatSectionDate = (recordedAt: string): string =>
     year: "numeric",
   });
 
-const sections = Object.values(
-  cardList.reduce<Record<string, card[]>>((groups, item) => {
-    const dateKey = getDateKey(item.recordedAt);
-    groups[dateKey] ??= [];
-    groups[dateKey].push(item);
-    return groups;
-  }, {}),
-)
-  .map((data) => ({
-    title: formatSectionDate(data[0].recordedAt),
-    dateKey: getDateKey(data[0].recordedAt),
-    data: data.sort(
-      (first, second) =>
-        new Date(second.recordedAt).getTime() -
-        new Date(first.recordedAt).getTime(),
-    ),
-  }))
-  .sort((first, second) => second.dateKey.localeCompare(first.dateKey));
-
 export default function Index() {
-  // const scheme = useColorScheme();
-  // const isDarkMode = scheme === "dark";
-  // const colors = Colors[scheme === 'unspecified' ? 'dark' : scheme];
+  const [checks, setChecks] = useState<PriceCheck[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const refreshChecks = useCallback(() => {
+    getChecks()
+      .then(setChecks)
+      .catch(() => setChecks([]));
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshChecks();
+    }, [refreshChecks]),
+  );
+  const sections = Object.values(
+    checks.reduce<Record<string, PriceCheck[]>>((groups, item) => {
+      const dateKey = getDateKey(item.createdAt);
+      groups[dateKey] ??= [];
+      groups[dateKey].push(item);
+      return groups;
+    }, {}),
+  )
+    .map((data) => ({
+      title: formatSectionDate(data[0].createdAt),
+      dateKey: getDateKey(data[0].createdAt),
+      data,
+    }))
+    .sort((first, second) => second.dateKey.localeCompare(first.dateKey));
+
+  const isSelectionMode = selectedIds.length > 0;
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((itemId) => itemId !== id)
+        : [...current, id],
+    );
+  };
+
+  const handleDeleteSelected = () => {
+    if (!selectedIds.length) {
+      return;
+    }
+
+    Alert.alert(
+      "Delete selected summaries?",
+      `This will remove ${selectedIds.length} saved summary${selectedIds.length > 1 ? "ies" : ""}.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await Promise.all(selectedIds.map((id) => deleteCheck(id)));
+            setSelectedIds([]);
+            refreshChecks();
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -54,20 +102,47 @@ export default function Index() {
           <Text style={styles.eyebrow}>PRICE CHECKS</Text>
           <Text style={styles.heading}>Your products</Text>
         </View>
+        {isSelectionMode ? (
+          <Pressable onPress={handleDeleteSelected} style={styles.deleteButton}>
+            <SymbolView
+              name={{ ios: "trash", android: "delete" }}
+              size={20}
+              tintColor={colors.accent}
+              weight={{ ios: "bold", android: bold }}
+            />
+            {/* <Text style={styles.deleteButtonText}>Delete</Text> */}
+          </Pressable>
+        ) : null}
       </View>
       <SectionList
         sections={sections}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item }) => (
           <Cards
-            card={item}
+            card={{
+              id: item.id,
+              recordedAt: new Date(item.createdAt).toISOString(),
+              img: item.imageUri ? { uri: item.imageUri } : undefined,
+              original_price: item.pricePaid,
+              suggested_price: (item.marketLow + item.marketHigh) / 2,
+              title: item.productName,
+              summary: item.reasoning,
+              verdict: item.verdict,
+            }}
             style={styles.card}
-            onPress={() =>
+            isSelected={selectedIds.includes(item.id)}
+            onLongPress={() => toggleSelection(item.id)}
+            onPress={() => {
+              if (isSelectionMode) {
+                toggleSelection(item.id);
+                return;
+              }
+
               router.push({
                 pathname: "/product/[id]",
-                params: { id: String(item.id) },
-              })
-            }
+                params: { id: item.id },
+              });
+            }}
           />
         )}
         renderSectionHeader={({ section }) => (
@@ -78,10 +153,15 @@ export default function Index() {
         showsVerticalScrollIndicator
       />
       <Link href="/upload" asChild>
-          <Pressable style={styles.addButton} accessibilityRole="button">
-            <Text style={styles.addButtonText}>+</Text>
-          </Pressable>
-        </Link>
+        <Pressable style={styles.addButton} accessibilityRole="button">
+          <SymbolView
+            name={{ ios: "plus", android: "add" }}
+            size={30}
+            tintColor={colors.text}
+            weight={{ ios: "bold", android: bold }}
+          />
+        </Pressable>
+      </Link>
     </View>
   );
 }
@@ -91,7 +171,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     // flexDirection: 'column'
-    // 
+    //
   },
   scrollView: {
     flex: 1,
@@ -99,7 +179,7 @@ const styles = StyleSheet.create({
   content: {
     marginBottom: 20,
     paddingHorizontal: 20,
-    paddingBottom: 100
+    paddingBottom: 100,
   },
   sectionHeader: {
     marginTop: 30,
@@ -114,14 +194,14 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 12,
     backgroundColor: colors.backgroundElement,
-    borderBottomWidth: 1
+    borderBottomWidth: 1,
   },
   eyebrow: {
     color: colors.textSecondary,
@@ -137,16 +217,47 @@ const styles = StyleSheet.create({
   addButton: {
     backgroundColor: colors.backgroundElement,
     borderRadius: 7,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
     position: "absolute",
     bottom: 50,
     right: 20,
     boxShadow: `3px 3px 0px black`,
-    borderWidth: 1
+    borderWidth: 1,
+    paddingTop: 3,
+    paddingLeft: 5,
   },
   addButtonText: {
     color: colors.text,
+    fontWeight: "bold",
+  },
+  addButtonIcon: {
+    color: colors.text,
+    fontSize: 50,
+    fontWeight: "700",
+    lineHeight: 30,
+  },
+  deleteButton: {
+    backgroundColor: "transparent",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    // borderWidth: 1,
+    color: colors.accent,
+    // borderColor: colors.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  deleteButtonIcon: {
+    color: "#3D5AFE",
+    fontSize: 16,
+    lineHeight: 16,
+  },
+  deleteButtonText: {
+    color: colors.accent,
     fontWeight: "bold",
   },
 });

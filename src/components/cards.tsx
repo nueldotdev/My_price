@@ -5,11 +5,31 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 interface CardsProps extends Prop {
   card: card;
   onPress?: () => void;
+  onLongPress?: () => void;
+  isSelected?: boolean;
 }
 
-const Cards = ({ card, style, onPress }: CardsProps) => {
-  const colors = Colors.light;
+const formatNaira = (value?: number): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "₦0";
+  }
 
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
+const colors = Colors.light;
+
+const Cards = ({
+  card,
+  style,
+  onPress,
+  onLongPress,
+  isSelected = false,
+}: CardsProps) => {
   // calculate the difference between market avg and the given price
   const calcDiff = (price?: number, avg?: number): string => {
     if (price === undefined || avg === undefined || avg === 0) {
@@ -30,7 +50,13 @@ const Cards = ({ card, style, onPress }: CardsProps) => {
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, style, pressed && styles.pressed]}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [
+        styles.card,
+        style,
+        isSelected && styles.selected,
+        pressed && styles.pressed,
+      ]}
       accessibilityRole="button"
     >
       <View
@@ -98,7 +124,7 @@ const Cards = ({ card, style, onPress }: CardsProps) => {
                     fontWeight: "bold",
                   }}
                 >
-                  ${card.original_price}
+                  {formatNaira(card.original_price)}
                 </Text>
                 <View
                   style={{
@@ -128,7 +154,7 @@ const Cards = ({ card, style, onPress }: CardsProps) => {
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                   {" "}
-                  ${card.suggested_price}
+                  {formatNaira(card.suggested_price)}
                 </Text>
               </View>
             </View>
@@ -150,6 +176,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 2,
     boxShadow: `4px 4px 0px black`,
+  },
+  selected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.backgroundSelected,
   },
   pressed: {
     opacity: 0.9,

@@ -2,6 +2,16 @@
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
+## Gemini setup
+
+Create a `.env` file in the project root with a Gemini API key before running the app:
+
+```bash
+EXPO_PUBLIC_GEMINI_API_KEY=your_api_key
+```
+
+The upload screen sends the description, listed price, and optional link to Gemini, then stores the structured analysis in AsyncStorage. `EXPO_PUBLIC_` values are bundled into the client, so use a server-side proxy before shipping a production build.
+
 ## Get started
 
 1. Install dependencies

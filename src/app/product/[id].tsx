@@ -1,6 +1,9 @@
-import { cardList } from "@/constants/demo-data";
 import { Colors } from "@/constants/theme";
+import { getCheckById } from "@/lib/db";
 import { router, useLocalSearchParams } from "expo-router";
+import { SymbolView } from "expo-symbols";
+import bold from "expo-symbols/androidWeights/bold";
+import { useEffect, useState } from "react";
 import {
   Image,
   Pressable,
@@ -12,9 +15,25 @@ import {
 
 const colors = Colors.light;
 
+const formatNaira = (value?: number): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "₦0";
+  }
+
+  return new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 export default function ProductSummary() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const product = cardList.find((item) => String(item.id) === id);
+  const [product, setProduct] =
+    useState<Awaited<ReturnType<typeof getCheckById>>>(null);
+  useEffect(() => {
+    if (id) getCheckById(id).then(setProduct);
+  }, [id]);
 
   if (!product) {
     return (
@@ -30,16 +49,28 @@ export default function ProductSummary() {
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>‹ Back</Text>
-      </Pressable>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.backButton}
+          accessibilityRole="button"
+        >
+          <SymbolView
+            name={{ ios: "arrow.left", android: "arrow_back" }}
+            size={18}
+            tintColor={colors.accent}
+            weight={{ ios: "bold", android: bold }}
+          />
+          <Text style={styles.backText}>Back</Text>
+        </Pressable>
       </View>
 
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.main}>
-          {product.img && <Image source={product.img} style={styles.image} />}
+          {product.imageUri ? (
+            <Image source={{ uri: product.imageUri }} style={styles.image} />
+          ) : null}
           <Text style={styles.eyebrow}>PRODUCT SUMMARY</Text>
-          <Text style={styles.title}>{product.title}</Text>
+          <Text style={styles.title}>{product.productName}</Text>
           <View
             style={[
               styles.badge,
@@ -57,30 +88,22 @@ export default function ProductSummary() {
           <View style={styles.priceRow}>
             <View>
               <Text style={styles.label}>Listed price</Text>
-              <Text style={styles.price}>${product.original_price}</Text>
+              <Text style={styles.price}>{formatNaira(product.pricePaid)}</Text>
             </View>
             <View>
               <Text style={styles.label}>Market average</Text>
-              <Text style={styles.price}>${product.suggested_price}</Text>
+              <Text style={styles.price}>
+                {formatNaira(product.marketLow)} -{" "}
+                {formatNaira(product.marketHigh)}
+              </Text>
             </View>
           </View>
 
           <Text style={styles.sectionLabel}>Summary</Text>
-          <Text style={styles.summary}>{product.summary}</Text>
-
-          {product.details && product.details.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>Details</Text>
-              {product.details.map((detail) => (
-                <Text key={detail} style={styles.detail}>
-                  • {detail}
-                </Text>
-              ))}
-            </>
-          )}
+          <Text style={styles.summary}>{product.reasoning}</Text>
 
           <Text style={styles.recorded}>
-            Recorded {new Date(product.recordedAt).toLocaleString()}
+            Recorded {new Date(product.createdAt).toLocaleString()}
           </Text>
         </View>
       </ScrollView>
@@ -104,7 +127,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 0,
     backgroundColor: colors.backgroundElement,
-    borderBottomWidth: 1
+    borderBottomWidth: 1,
   },
   main: {
     padding: 24,
@@ -120,7 +143,14 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: colors.accent,
   },
-  backButton: { alignSelf: "flex-start", marginBottom: 24 },
+  backButton: {
+    alignSelf: "flex-start",
+    marginBottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  backIcon: { color: colors.accent, fontSize: 18, fontWeight: "bold" },
   backText: { color: colors.accent, fontSize: 16, fontWeight: "bold" },
   image: {
     width: "100%",
@@ -142,6 +172,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 6,
     marginBottom: 14,
+    flexShrink: 1,
+    maxWidth: "100%",
   },
   badge: {
     alignSelf: "flex-start",
@@ -150,11 +182,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     boxShadow: `1px 2px 0px black`,
+    maxWidth: "100%",
   },
   badgeText: { color: colors.text, fontSize: 13, fontWeight: "bold" },
-  priceRow: { flexDirection: "row", gap: 36, marginTop: 28, marginBottom: 28 },
+  priceRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 36,
+    rowGap: 16,
+    marginTop: 28,
+    marginBottom: 28,
+  },
   label: { color: colors.textSecondary, fontSize: 12, marginBottom: 4 },
-  price: { color: colors.text, fontSize: 22, fontWeight: "bold" },
+  price: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "bold",
+    flexShrink: 1,
+    maxWidth: "100%",
+  },
   sectionLabel: {
     color: colors.text,
     fontSize: 18,
@@ -162,7 +208,13 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
   },
-  summary: { color: colors.text, fontSize: 16, lineHeight: 24 },
+  summary: {
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 24,
+    flexShrink: 1,
+    maxWidth: "100%",
+  },
   detail: { color: colors.textSecondary, fontSize: 15, lineHeight: 24 },
   recorded: { color: colors.textTertiary, fontSize: 12, marginTop: 28 },
   button: {
